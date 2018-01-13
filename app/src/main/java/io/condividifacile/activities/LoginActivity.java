@@ -112,7 +112,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                                 if(singleSnapshot.getKey().equals(uid)){
                                     //Account già registrato nel DB
                                     exists = true;
-                                    Log.d("swag","User esistente");
                                 }
                             }
                             if(!exists){
@@ -179,8 +178,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
 
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
-        Log.d("swag", "firebaseAuthWithGoogle:" + acct.getId());
-
         AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
@@ -188,11 +185,9 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
                             // Sign in success, update UI with the signed-in user's information
-                            Log.d("swag", "signInWithCredential:success");
 
                         } else {
                             // If sign in fails, display a message to the user.
-                            Log.w("swag", "signInWithCredential:failure", task.getException());
                             progressDialog.dismiss();
                             Toast.makeText(LoginActivity.this, "Authentication failed.",
                                     Toast.LENGTH_SHORT).show();
@@ -236,7 +231,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
 
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        Log.d("swag", "onConnectionFailed:" + connectionResult);
     }
 
 
@@ -257,8 +251,6 @@ public class LoginActivity extends AppCompatActivity implements LoaderCallbacks<
         // Result returned from launching the Intent from GoogleSignInApi.getSignInIntent(...);
         if (requestCode == RC_SIGN_IN) {
             GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
-            Log.d("swag","got results here: "+result.getStatus());
-            Log.d("swag","got requestCode: "+requestCode);
             if (result.isSuccess()) {
                 // Google Sign In was successful, authenticate with Firebase
                 GoogleSignInAccount account = result.getSignInAccount();

@@ -31,6 +31,7 @@ import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
@@ -54,6 +55,8 @@ import com.google.firebase.database.ValueEventListener;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
@@ -104,12 +107,7 @@ public class UserActivity extends AppCompatActivity
         // Build a GoogleApiClient with access to the Google Sign-In API and the
         // options specified by gso.
         mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .enableAutoManage(this /* FragmentActivity */, new GoogleApiClient.OnConnectionFailedListener() {
-                    @Override
-                    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-                        Log.d("swag", "onConnectionFailed:" + connectionResult);
-                    }
-                })
+                .enableAutoManage(this /* FragmentActivity */,null)
                 .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
                 .build();
 
@@ -131,8 +129,6 @@ public class UserActivity extends AppCompatActivity
                 currentUser = mAuth.getCurrentUser();
                 if(currentUser != null) {
                     getUserExpenses();
-                    TextView testuser = (TextView) findViewById(R.id.testuser);
-                    testuser.setText(currentUser.getDisplayName());
                     name = currentUser.getDisplayName();
                     nameView.setText(name);
                     email = currentUser.getEmail();
@@ -176,13 +172,13 @@ public class UserActivity extends AppCompatActivity
 
     private void getUserExpenses(){
 
-        final ArrayList<Entry> expenses = new ArrayList<>();
+        final ArrayList<Expense> expenses = new ArrayList<>();
+        final ArrayList <Entry> entries = new ArrayList<>();
         final Map<Integer, String> dates = new HashMap<>();
         DatabaseReference groupsRef = database.getReference("groups");
         groupsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
-                int i = 0;
                 for(DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
                     if(singleSnapshot.child("members").hasChild(currentUser.getDisplayName())){
                         for(DataSnapshot expense : singleSnapshot.child("expenses").getChildren()){
@@ -194,15 +190,36 @@ public class UserActivity extends AppCompatActivity
                                 e.printStackTrace();
                             }
                             */
-                            Entry e = new Entry(i,Float.parseFloat(userAmount));
+                            Expense e = new Expense();
+                            e.setAmount(Float.parseFloat(userAmount));
+                            e.setDate(date);
                             expenses.add(e);
-                            dates.put(i,date);
-                            i++;
                         }
                     }
                 }
+                Collections.sort(expenses, new Comparator<Expense>() {
+                    @Override
+                    public int compare(Expense e1, Expense e2){
+                        SimpleDateFormat format = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
+                        Date d1 = null;
+                        Date d2 = null;
+                        try {
+                            d1 = format.parse(e1.getDate());
+                            d2 = format.parse(e2.getDate());
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        return d1.compareTo(d2);
+                    }
+                });
                 //updateChart
-                updateChart(expenses,dates);
+                for(int j = 0; j < expenses.size(); j++){
+                    Entry e = new Entry(j,expenses.get(j).getAmount());
+                    entries.add(e);
+                    dates.put(j,expenses.get(j).getDate());
+                }
+
+                updateChart(entries,dates);
             }
 
             @Override
@@ -213,7 +230,6 @@ public class UserActivity extends AppCompatActivity
     }
 
     private void updateChart(ArrayList<Entry> entries, final Map<Integer,String> dates){
-        Log.d("swag","Entries.size "+entries.size());
         lineChart.clear();
         if(entries.size() != 0){
             LineDataSet dataSet = new LineDataSet(entries,"User expenses");
@@ -221,12 +237,22 @@ public class UserActivity extends AppCompatActivity
             dataSet.setLineWidth(2f);
             dataSet.setDrawCircleHole(false);
             dataSet.setDrawFilled(true);
+            dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
+            dataSet.setCubicIntensity(.8f);
             LineData data = new LineData(dataSet);
+            YAxis yRightAxis = lineChart.getAxisRight();
+            yRightAxis.setEnabled(false);
+            YAxis yLeftAxis = lineChart.getAxisLeft();
+            yLeftAxis.setDrawTopYLabelEntry(true);
+            yLeftAxis.setDrawGridLines(false);
             XAxis xAxis = lineChart.getXAxis();
+            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+            xAxis.setDrawGridLines(false);
+            xAxis.setDrawLabels(true);
             xAxis.setValueFormatter(new IAxisValueFormatter() {
                 @Override
                 public String getFormattedValue(float value, AxisBase axis) {
-                    return dates.get((int)value);
+                    return dates.get((int)value).replaceAll("-[0-9][0-9][0-9][0-9]","").replace("-"," ");
                 }
             });
             Description dscr = new Description();

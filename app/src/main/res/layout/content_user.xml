@@ -16,9 +16,4 @@
         android:layout_margin="20dp">
 
     </com.github.mikephil.charting.charts.LineChart>
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/testuser"/>
 </RelativeLayout>
