@@ -30,6 +30,7 @@ import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.components.Description;
+import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
@@ -118,6 +119,7 @@ public class UserActivity extends AppCompatActivity
         final Menu navMenu = navView.getMenu();
         final TextView nameView = (TextView) header.findViewById(R.id.nameView);
         final TextView emailView = (TextView) header.findViewById(R.id.emailView);
+        final TextView userText = (TextView) findViewById(R.id.userText);
 
         //Getting user data and groups
         groups = new ArrayList<>();
@@ -143,6 +145,7 @@ public class UserActivity extends AppCompatActivity
                         intent.putExtra(DownloadIntentService.PENDING_RESULT_EXTRA, pendingResult);
                         startService(intent);
                     }
+                    userText.setText("Hey "+name.split(" ")[0]+"! Here you can find your total expenses among all groups!");
                     DatabaseReference groupsRef = database.getReference("users/" + uid + "/groups");
                     groupsRef.addValueEventListener(new ValueEventListener() {
                         @Override
@@ -179,6 +182,9 @@ public class UserActivity extends AppCompatActivity
         groupsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
+                expenses.clear();
+                entries.clear();
+                dates.clear();
                 for(DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
                     if(singleSnapshot.child("members").hasChild(currentUser.getDisplayName())){
                         for(DataSnapshot expense : singleSnapshot.child("expenses").getChildren()){
@@ -212,11 +218,21 @@ public class UserActivity extends AppCompatActivity
                         return d1.compareTo(d2);
                     }
                 });
+                for(int j = 0; j < expenses.size(); j++) {
+                    for (int k = 0; k < expenses.size(); k++) {
+                        if (k!=j && expenses.get(j).getDate().equals(expenses.get(k).getDate())) {
+                            expenses.get(j).setAmount(expenses.get(j).getAmount() + expenses.get(k).getAmount());
+                            expenses.get(k).setAmount(0);
+                        }
+                    }
+                }
                 //updateChart
                 for(int j = 0; j < expenses.size(); j++){
-                    Entry e = new Entry(j,expenses.get(j).getAmount());
-                    entries.add(e);
-                    dates.put(j,expenses.get(j).getDate());
+                    if(expenses.get(j).getAmount() != 0) {
+                        Entry e = new Entry(j, expenses.get(j).getAmount());
+                        entries.add(e);
+                        dates.put(j, expenses.get(j).getDate());
+                    }
                 }
 
                 updateChart(entries,dates);
@@ -232,7 +248,7 @@ public class UserActivity extends AppCompatActivity
     private void updateChart(ArrayList<Entry> entries, final Map<Integer,String> dates){
         lineChart.clear();
         if(entries.size() != 0){
-            LineDataSet dataSet = new LineDataSet(entries,"User expenses");
+            LineDataSet dataSet = new LineDataSet(entries,"");
             dataSet.setDrawValues(false);
             dataSet.setLineWidth(2f);
             dataSet.setDrawCircleHole(false);
@@ -257,6 +273,8 @@ public class UserActivity extends AppCompatActivity
             });
             Description dscr = new Description();
             dscr.setText("");
+            Legend legend = lineChart.getLegend();
+            legend.setEnabled(false);
             lineChart.setDescription(dscr);
             lineChart.setData(data);
             lineChart.setDrawBorders(false);

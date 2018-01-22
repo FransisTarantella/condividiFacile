@@ -27,6 +27,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import io.condividifacile.data.Notification;
@@ -103,7 +104,7 @@ public class AddExpenseActivity extends AppCompatActivity {
         final EditText amountText = (EditText) findViewById(R.id.amountEdit);
 
         Calendar c = Calendar.getInstance();
-        SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy");
+        SimpleDateFormat df = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
         final String formattedDate = df.format(c.getTime());
 
         Button completeBtn = (Button) findViewById(R.id.completeExp);
