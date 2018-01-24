@@ -22,7 +22,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,12 +35,15 @@ import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.DataSet;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.DefaultAxisValueFormatter;
 import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.github.mikephil.charting.utils.ColorTemplate;
 import com.google.android.gms.auth.api.Auth;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
 import com.google.android.gms.common.ConnectionResult;
@@ -84,6 +89,10 @@ public class UserActivity extends AppCompatActivity
     private String photoUrl;
     private ArrayList<String> groups;
     private LineChart lineChart;
+    final ArrayList<Integer> colors = new ArrayList<>();
+    final ArrayList<Expense> expenses = new ArrayList<>();
+    final ArrayList<String> categories = new ArrayList<>();
+    final Map<Integer, String> dates = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -120,6 +129,42 @@ public class UserActivity extends AppCompatActivity
         final TextView nameView = (TextView) header.findViewById(R.id.nameView);
         final TextView emailView = (TextView) header.findViewById(R.id.emailView);
         final TextView userText = (TextView) findViewById(R.id.userText);
+
+        //Line chart settings
+        for (int c : ColorTemplate.VORDIPLOM_COLORS)
+            colors.add(c);
+        for (int c : ColorTemplate.JOYFUL_COLORS)
+            colors.add(c);
+        for (int c : ColorTemplate.COLORFUL_COLORS)
+            colors.add(c);
+        for (int c : ColorTemplate.LIBERTY_COLORS)
+            colors.add(c);
+        for (int c : ColorTemplate.PASTEL_COLORS)
+            colors.add(c);
+        colors.add(ColorTemplate.getHoloBlue());
+
+        lineChart = (LineChart) findViewById(R.id.linechart);
+        YAxis yRightAxis = lineChart.getAxisRight();
+        yRightAxis.setEnabled(false);
+        YAxis yLeftAxis = lineChart.getAxisLeft();
+        yLeftAxis.setDrawTopYLabelEntry(true);
+        yLeftAxis.setDrawGridLines(false);
+        yLeftAxis.setAxisMinimum(0f);
+        XAxis xAxis = lineChart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setDrawGridLines(false);
+        xAxis.setDrawLabels(true);
+        xAxis.setValueFormatter(new IAxisValueFormatter() {
+            @Override
+            public String getFormattedValue(float value, AxisBase axis) {
+                return dates.get((int) value).replaceAll("-[0-9][0-9][0-9][0-9]", "").replace("-", " ");
+            }
+        });
+        Description dscr = new Description();
+        dscr.setText("");
+        lineChart.setDrawBorders(false);
+        lineChart.setDrawGridBackground(false);
+        lineChart.setDescription(dscr);
 
         //Getting user data and groups
         groups = new ArrayList<>();
@@ -169,27 +214,33 @@ public class UserActivity extends AppCompatActivity
             }
         });
 
-        lineChart = (LineChart) findViewById(R.id.linechart);
-
+        Switch cat_switch = (Switch) findViewById(R.id.categories_switch);
+        cat_switch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if(isChecked){
+                    updateChart(expenses, dates,true);
+                } else {
+                    updateChart(expenses, dates, false);
+                }
+            }
+        });
     }
 
     private void getUserExpenses(){
 
-        final ArrayList<Expense> expenses = new ArrayList<>();
-        final ArrayList <Entry> entries = new ArrayList<>();
-        final Map<Integer, String> dates = new HashMap<>();
         DatabaseReference groupsRef = database.getReference("groups");
         groupsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 expenses.clear();
-                entries.clear();
-                dates.clear();
+                categories.clear();
                 for(DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
                     if(singleSnapshot.child("members").hasChild(currentUser.getDisplayName())){
                         for(DataSnapshot expense : singleSnapshot.child("expenses").getChildren()){
                             String userAmount = expense.child("division").child(currentUser.getDisplayName()).getValue().toString();
                             String date = (String) expense.child("date").getValue();
+                            String category = (String) expense.child("category").getValue();
                             /*try {
                                  formattedDate = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY).parse(date);
                             } catch (ParseException e) {
@@ -199,43 +250,15 @@ public class UserActivity extends AppCompatActivity
                             Expense e = new Expense();
                             e.setAmount(Float.parseFloat(userAmount));
                             e.setDate(date);
+                            e.setCategory(category);
                             expenses.add(e);
+                            if(!categories.contains(category)){
+                                categories.add(category);
+                            }
                         }
                     }
                 }
-                Collections.sort(expenses, new Comparator<Expense>() {
-                    @Override
-                    public int compare(Expense e1, Expense e2){
-                        SimpleDateFormat format = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
-                        Date d1 = null;
-                        Date d2 = null;
-                        try {
-                            d1 = format.parse(e1.getDate());
-                            d2 = format.parse(e2.getDate());
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
-                        return d1.compareTo(d2);
-                    }
-                });
-                for(int j = 0; j < expenses.size(); j++) {
-                    for (int k = 0; k < expenses.size(); k++) {
-                        if (k!=j && expenses.get(j).getDate().equals(expenses.get(k).getDate())) {
-                            expenses.get(j).setAmount(expenses.get(j).getAmount() + expenses.get(k).getAmount());
-                            expenses.get(k).setAmount(0);
-                        }
-                    }
-                }
-                //updateChart
-                for(int j = 0; j < expenses.size(); j++){
-                    if(expenses.get(j).getAmount() != 0) {
-                        Entry e = new Entry(j, expenses.get(j).getAmount());
-                        entries.add(e);
-                        dates.put(j, expenses.get(j).getDate());
-                    }
-                }
-
-                updateChart(entries,dates);
+                updateChart(expenses, dates, false);
             }
 
             @Override
@@ -245,47 +268,93 @@ public class UserActivity extends AppCompatActivity
         });
     }
 
-    private void updateChart(ArrayList<Entry> entries, final Map<Integer,String> dates){
+    private void updateChart(ArrayList<Expense> expenses, final Map<Integer,String> dates, boolean byCategories){
         lineChart.clear();
-        if(entries.size() != 0){
-            LineDataSet dataSet = new LineDataSet(entries,"");
-            dataSet.setDrawValues(false);
-            dataSet.setLineWidth(2f);
-            dataSet.setDrawCircleHole(false);
-            dataSet.setDrawFilled(true);
-            dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
-            dataSet.setCubicIntensity(.8f);
-            LineData data = new LineData(dataSet);
-            YAxis yRightAxis = lineChart.getAxisRight();
-            yRightAxis.setEnabled(false);
-            YAxis yLeftAxis = lineChart.getAxisLeft();
-            yLeftAxis.setDrawTopYLabelEntry(true);
-            yLeftAxis.setDrawGridLines(false);
-            XAxis xAxis = lineChart.getXAxis();
-            xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-            xAxis.setDrawGridLines(false);
-            xAxis.setDrawLabels(true);
-            xAxis.setValueFormatter(new IAxisValueFormatter() {
-                @Override
-                public String getFormattedValue(float value, AxisBase axis) {
-                    return dates.get((int)value).replaceAll("-[0-9][0-9][0-9][0-9]","").replace("-"," ");
+        dates.clear();
+        Collections.sort(expenses, new Comparator<Expense>() {
+            @Override
+            public int compare(Expense e1, Expense e2){
+                SimpleDateFormat format = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
+                Date d1 = null;
+                Date d2 = null;
+                try {
+                    d1 = format.parse(e1.getDate());
+                    d2 = format.parse(e2.getDate());
+                } catch (ParseException e) {
+                    e.printStackTrace();
                 }
-            });
-            Description dscr = new Description();
-            dscr.setText("");
-            Legend legend = lineChart.getLegend();
-            legend.setEnabled(false);
-            lineChart.setDescription(dscr);
-            lineChart.setData(data);
-            lineChart.setDrawBorders(false);
-            lineChart.setDrawGridBackground(false);
-            lineChart.invalidate();
+                return d1.compareTo(d2);
+            }
+        });
+        if(expenses.size() != 0){
+            if(!byCategories) {
+                ArrayList <Entry> entries = new ArrayList<>();
+                ArrayList <Expense> tmpExp = new ArrayList<>();
+                for(int i = 0; i < expenses.size(); i++){
+                    Expense e = new Expense();
+                    e.setCategory(expenses.get(i).getCategory());
+                    e.setDate(expenses.get(i).getDate());
+                    e.setAmount(expenses.get(i).getAmount());
+                    tmpExp.add(e);
+                }
+                for(int j = 0; j < tmpExp.size(); j++) {
+                    for (int k = 0; k < tmpExp.size(); k++) {
+                        if (k!=j && tmpExp.get(j).getDate().equals(tmpExp.get(k).getDate())) {
+                            tmpExp.get(j).setAmount(tmpExp.get(j).getAmount() + tmpExp.get(k).getAmount());
+                            tmpExp.get(k).setAmount(0);
+                        }
+                    }
+                }
+                for(int j = 0; j < tmpExp.size(); j++){
+                    if(tmpExp.get(j).getAmount() != 0) {
+                        Entry e = new Entry(j, tmpExp.get(j).getAmount());
+                        entries.add(e);
+                        dates.put(j, tmpExp.get(j).getDate());
+                        Log.d("swag", tmpExp.get(j).getCategory()+", "+tmpExp.get(j).getDate()+", "+tmpExp.get(j).getAmount());
+                    }
+                }
+                LineDataSet dataSet = new LineDataSet(entries, "Total");
+                dataSet.setDrawValues(false);
+                dataSet.setLineWidth(2f);
+                dataSet.setDrawCircleHole(false);
+                dataSet.setDrawFilled(true);
+                dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
+                dataSet.setCubicIntensity(.8f);
+                LineData data = new LineData(dataSet);
+                lineChart.setData(data);
+                lineChart.invalidate();
+            } else {
+                dates.clear();
+                ArrayList<ILineDataSet> dataSets = new ArrayList<>();
+                for(int i = 0; i < categories.size(); i++){
+                    ArrayList <Entry> entries = new ArrayList<>();
+                    for(int j = 0; j < expenses.size(); j++){
+                        if(expenses.get(j).getCategory().equals(categories.get(i))){
+                            Entry e = new Entry(j, expenses.get(j).getAmount());
+                            entries.add(e);
+                            dates.put(j,expenses.get(j).getDate());
+                            Log.d("swag", expenses.get(j).getCategory()+", "+expenses.get(j).getDate()+", "+expenses.get(j).getAmount());
+                        }
+                    }
+                    LineDataSet dataSet = new LineDataSet(entries,categories.get(i));
+                    dataSet.setDrawValues(false);
+                    dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
+                    dataSet.setCubicIntensity(.8f);
+                    dataSet.setDrawCircleHole(false);
+                    dataSet.setColor(colors.get(i));
+                    dataSet.setCircleColor(colors.get(i));
+                    dataSets.add(dataSet);
+                }
+                LineData data = new LineData(dataSets);
+                lineChart.setData(data);
+                lineChart.invalidate();
+            }
         }
     }
 
     @Override
     public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.user_drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
         } else {
