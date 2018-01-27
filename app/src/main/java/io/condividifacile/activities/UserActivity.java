@@ -92,7 +92,7 @@ public class UserActivity extends AppCompatActivity
     final ArrayList<Integer> colors = new ArrayList<>();
     final ArrayList<Expense> expenses = new ArrayList<>();
     final ArrayList<String> categories = new ArrayList<>();
-    final Map<Integer, String> dates = new HashMap<>();
+    final Map<String, Integer> dates = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -150,16 +150,6 @@ public class UserActivity extends AppCompatActivity
         yLeftAxis.setDrawTopYLabelEntry(true);
         yLeftAxis.setDrawGridLines(false);
         yLeftAxis.setAxisMinimum(0f);
-        XAxis xAxis = lineChart.getXAxis();
-        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setDrawGridLines(false);
-        xAxis.setDrawLabels(true);
-        xAxis.setValueFormatter(new IAxisValueFormatter() {
-            @Override
-            public String getFormattedValue(float value, AxisBase axis) {
-                return dates.get((int) value).replaceAll("-[0-9][0-9][0-9][0-9]", "").replace("-", " ");
-            }
-        });
         Description dscr = new Description();
         dscr.setText("");
         lineChart.setDrawBorders(false);
@@ -219,9 +209,9 @@ public class UserActivity extends AppCompatActivity
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if(isChecked){
-                    updateChart(expenses, dates,true);
+                    updateChart(expenses, true);
                 } else {
-                    updateChart(expenses, dates, false);
+                    updateChart(expenses, false);
                 }
             }
         });
@@ -241,13 +231,8 @@ public class UserActivity extends AppCompatActivity
                             String userAmount = expense.child("division").child(currentUser.getDisplayName()).getValue().toString();
                             String date = (String) expense.child("date").getValue();
                             String category = (String) expense.child("category").getValue();
-                            /*try {
-                                 formattedDate = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY).parse(date);
-                            } catch (ParseException e) {
-                                e.printStackTrace();
-                            }
-                            */
                             Expense e = new Expense();
+                            e.setId(expense.getKey());
                             e.setAmount(Float.parseFloat(userAmount));
                             e.setDate(date);
                             e.setCategory(category);
@@ -258,7 +243,23 @@ public class UserActivity extends AppCompatActivity
                         }
                     }
                 }
-                updateChart(expenses, dates, false);
+                Collections.sort(expenses, new Comparator<Expense>() {
+                    @Override
+                    public int compare(Expense e1, Expense e2){
+                        SimpleDateFormat format = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
+                        Date d1 = null;
+                        Date d2 = null;
+                        try {
+                            d1 = format.parse(e1.getDate());
+                            d2 = format.parse(e2.getDate());
+                        } catch (ParseException e) {
+                            e.printStackTrace();
+                        }
+                        return d1.compareTo(d2);
+                    }
+                });
+
+                updateChart(expenses, false);
             }
 
             @Override
@@ -268,49 +269,28 @@ public class UserActivity extends AppCompatActivity
         });
     }
 
-    private void updateChart(ArrayList<Expense> expenses, final Map<Integer,String> dates, boolean byCategories){
+    private void updateChart(ArrayList<Expense> expenses, boolean byCategories){
         lineChart.clear();
-        dates.clear();
-        Collections.sort(expenses, new Comparator<Expense>() {
-            @Override
-            public int compare(Expense e1, Expense e2){
-                SimpleDateFormat format = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
-                Date d1 = null;
-                Date d2 = null;
-                try {
-                    d1 = format.parse(e1.getDate());
-                    d2 = format.parse(e2.getDate());
-                } catch (ParseException e) {
-                    e.printStackTrace();
-                }
-                return d1.compareTo(d2);
-            }
-        });
+
         if(expenses.size() != 0){
             if(!byCategories) {
-                ArrayList <Entry> entries = new ArrayList<>();
-                ArrayList <Expense> tmpExp = new ArrayList<>();
-                for(int i = 0; i < expenses.size(); i++){
-                    Expense e = new Expense();
-                    e.setCategory(expenses.get(i).getCategory());
-                    e.setDate(expenses.get(i).getDate());
-                    e.setAmount(expenses.get(i).getAmount());
-                    tmpExp.add(e);
-                }
-                for(int j = 0; j < tmpExp.size(); j++) {
-                    for (int k = 0; k < tmpExp.size(); k++) {
-                        if (k!=j && tmpExp.get(j).getDate().equals(tmpExp.get(k).getDate())) {
-                            tmpExp.get(j).setAmount(tmpExp.get(j).getAmount() + tmpExp.get(k).getAmount());
-                            tmpExp.get(k).setAmount(0);
+                final ArrayList <Entry> entries = new ArrayList<>();
+                final HashMap<Integer, String> dates = new HashMap<>();
+                ArrayList<String> addedExp = new ArrayList<>();
+                int counter = 0;
+                for(int j = 0; j < expenses.size(); j++) {
+                    if(!addedExp.contains(expenses.get(j).getId())) {
+                        float e_val = expenses.get(j).getAmount();
+                        for (int k = j + 1; k < expenses.size(); k++) {
+                            if (expenses.get(j).getDate().equals(expenses.get(k).getDate())) {
+                                e_val += expenses.get(k).getAmount();
+                                addedExp.add(expenses.get(k).getId());
+                            }
                         }
-                    }
-                }
-                for(int j = 0; j < tmpExp.size(); j++){
-                    if(tmpExp.get(j).getAmount() != 0) {
-                        Entry e = new Entry(j, tmpExp.get(j).getAmount());
+                        Entry e = new Entry(counter, e_val, expenses.get(j).getDate());
                         entries.add(e);
-                        dates.put(j, tmpExp.get(j).getDate());
-                        Log.d("swag", tmpExp.get(j).getCategory()+", "+tmpExp.get(j).getDate()+", "+tmpExp.get(j).getAmount());
+                        dates.put(counter,expenses.get(j).getDate());
+                        counter++;
                     }
                 }
                 LineDataSet dataSet = new LineDataSet(entries, "Total");
@@ -320,32 +300,67 @@ public class UserActivity extends AppCompatActivity
                 dataSet.setDrawFilled(true);
                 dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
                 dataSet.setCubicIntensity(.8f);
+                XAxis xAxis = lineChart.getXAxis();
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setDrawGridLines(false);
+                xAxis.setDrawLabels(true);
+                xAxis.setLabelCount(6, true);
+                xAxis.setValueFormatter(new IAxisValueFormatter() {
+                    @Override
+                    public String getFormattedValue(float value, AxisBase axis) {
+                        if(dates.get((int)value) != null){
+                            return dates.get((int)value)
+                                    .replaceAll("-[0-9][0-9][0-9][0-9]", "")
+                                    .replace("-", " ");
+                        }
+                        return "";
+                    }
+                });
                 LineData data = new LineData(dataSet);
                 lineChart.setData(data);
                 lineChart.invalidate();
             } else {
-                dates.clear();
-                ArrayList<ILineDataSet> dataSets = new ArrayList<>();
+                final Map <String, ILineDataSet> dataSets = new HashMap<>();
+                final Map <Integer,String> dates = new HashMap<>();
+                final Map <String, Integer> datesIDs = new HashMap<>();
+                for(int k = 0; k < expenses.size(); k++){
+                    datesIDs.put(expenses.get(k).getDate(),k);
+                    dates.put(k,expenses.get(k).getDate());
+                }
                 for(int i = 0; i < categories.size(); i++){
                     ArrayList <Entry> entries = new ArrayList<>();
                     for(int j = 0; j < expenses.size(); j++){
                         if(expenses.get(j).getCategory().equals(categories.get(i))){
-                            Entry e = new Entry(j, expenses.get(j).getAmount());
-                            entries.add(e);
-                            dates.put(j,expenses.get(j).getDate());
-                            Log.d("swag", expenses.get(j).getCategory()+", "+expenses.get(j).getDate()+", "+expenses.get(j).getAmount());
+                            entries.add(new Entry(datesIDs.get(expenses.get(j).getDate()),
+                                    expenses.get(j).getAmount(), expenses.get(j).getDate()));
                         }
                     }
-                    LineDataSet dataSet = new LineDataSet(entries,categories.get(i));
+                    LineDataSet dataSet = new LineDataSet(entries, categories.get(i));
                     dataSet.setDrawValues(false);
                     dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
                     dataSet.setCubicIntensity(.8f);
                     dataSet.setDrawCircleHole(false);
                     dataSet.setColor(colors.get(i));
                     dataSet.setCircleColor(colors.get(i));
-                    dataSets.add(dataSet);
+                    dataSets.put(categories.get(i), dataSet);
                 }
-                LineData data = new LineData(dataSets);
+                XAxis xAxis = lineChart.getXAxis();
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setDrawGridLines(false);
+                xAxis.setDrawLabels(true);
+                xAxis.setLabelCount(6, true);
+                xAxis.setValueFormatter(new IAxisValueFormatter() {
+                    @Override
+                    public String getFormattedValue(float value, AxisBase axis) {
+                        if (dates.get((int)value) != null){
+                            return dates.get((int) value)
+                                    .replaceAll("-[0-9][0-9][0-9][0-9]", "")
+                                    .replace("-", " ");
+                        }
+                        return "";
+                    }
+                });
+                LineData data = new LineData(new ArrayList<ILineDataSet>(dataSets.values()));
                 lineChart.setData(data);
                 lineChart.invalidate();
             }

@@ -62,8 +62,14 @@ import com.google.firebase.database.ServerValue;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.messaging.FirebaseMessaging;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import io.condividifacile.services.DownloadIntentService;
@@ -556,6 +562,21 @@ public class GroupActivity extends AppCompatActivity
                             //Missing date, description and photo on DB
                             expenses.add(exp);
                         }
+                        Collections.sort(expenses, new Comparator<Expense>() {
+                            @Override
+                            public int compare(Expense e1, Expense e2){
+                                SimpleDateFormat format = new SimpleDateFormat("dd-MMM-yyyy", Locale.ITALY);
+                                Date d1 = null;
+                                Date d2 = null;
+                                try {
+                                    d1 = format.parse(e1.getDate());
+                                    d2 = format.parse(e2.getDate());
+                                } catch (ParseException e) {
+                                    e.printStackTrace();
+                                }
+                                return d1.compareTo(d2);
+                            }
+                        });
                         members.clear();
                         for(DataSnapshot member :  singleSnapshot.child("members").getChildren()){
                             members.add(new Pair<String, String>(member.getKey(),member.getValue().toString()));

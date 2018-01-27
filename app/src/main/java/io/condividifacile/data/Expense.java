@@ -13,6 +13,7 @@ import java.util.HashMap;
 
 public class Expense implements java.io.Serializable {
 
+    private String id;
     private String category;
     private float amount;
     private String buyer;
@@ -75,5 +76,13 @@ public class Expense implements java.io.Serializable {
 
     public void setDivision(HashMap<String, Double> division) {
         this.division = division;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
     }
 }
